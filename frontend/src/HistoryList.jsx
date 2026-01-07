@@ -16,7 +16,7 @@ export default function HistoryList({ history, onDelete }) {
       }}
     >
       {history.map((fileObj) => (
-        <HistoryItem key={fileObj.name} fileObj={fileObj} onDelete={onDelete} />
+        <HistoryItem key={fileObj.file_name} fileObj={fileObj} onDelete={onDelete} />
       ))}
     </div>
   );
