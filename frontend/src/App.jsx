@@ -2,13 +2,14 @@ import React, { useState, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 import HistoryList from "./HistoryList";
+import backgroundImage from "./assets/pexels-caio-46274.jpg";
 
 export default function App() {
   const [files, setFiles] = useState([]);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Fetch history from backend (MySQL)
+  // Fetch history from backend
   const fetchHistory = async () => {
     try {
       const res = await axios.get("http://127.0.0.1:8000/api/ocr/history/");
@@ -46,6 +47,9 @@ export default function App() {
     backgroundColor: color,
     transition: "all 0.3s ease",
     marginRight: "10px",
+    display: "flex",
+    alignItems: "center",
+    gap: "5px",
   });
 
   const handleHover = (e) => {
@@ -57,7 +61,24 @@ export default function App() {
     e.target.style.boxShadow = "0 4px 6px rgba(0,0,0,0.2)";
   };
 
-  // Upload a single file
+  // Download helper
+  const handleDownload = async (url, filename) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed", err);
+    }
+  };
+
   const uploadFile = async (fileObj, index) => {
     const formData = new FormData();
     formData.append("file", fileObj.file);
@@ -85,7 +106,6 @@ export default function App() {
         }
       );
 
-      // Update file status and result
       setFiles((prev) =>
         prev.map((f, i) =>
           i === index
@@ -94,7 +114,6 @@ export default function App() {
         )
       );
 
-      // Refresh backend history after upload
       fetchHistory();
     } catch (err) {
       console.error(err);
@@ -104,15 +123,6 @@ export default function App() {
     }
   };
 
-  // Upload all pending/error files
-  const handleUploadAll = () => {
-    files.forEach((fileObj, index) => {
-      if (fileObj.status === "pending" || fileObj.status === "error")
-        uploadFile(fileObj, index);
-    });
-  };
-
-  // Delete from backend (MySQL + local files)
   const handleDelete = async (filename) => {
     try {
       await axios.delete(`http://127.0.0.1:8000/api/ocr/delete/${filename}/`);
@@ -128,7 +138,7 @@ export default function App() {
         padding: "2rem",
         fontFamily: "Arial, sans-serif",
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #eff1f3, #2565cc)",
+        background: `linear-gradient(rgba(255,255,255,0.3), rgba(0,0,0,0.3)), url(${backgroundImage}) center/cover no-repeat`,
       }}
     >
       <h1
@@ -141,164 +151,250 @@ export default function App() {
         OCR Extractor
       </h1>
 
-      {/* Dropzone */}
-      <div
-        {...getRootProps()}
-        style={{
-          border: "2px dashed #007bff",
-          borderRadius: "25px",
-          padding: "2rem",
-          textAlign: "center",
-          maxWidth: "700px",
-          minHeight: "150px",
-          margin: "auto",
-          backgroundColor: isDragActive ? "#d0e8ff" : "#f8f9fa",
-          cursor: "pointer",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <input {...getInputProps()} />
-        {isDragActive ? (
-          <p>Drop PDFs here...</p>
-        ) : (
-          <p>Drag & drop PDFs here, or click to select files</p>
-        )}
-      </div>
-
-      {/* Upload All */}
-      {files.length > 0 && (
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+      {/* Show History button at top-right */}
+      <div style={{ position: "absolute", top: "20px", right: "20px" }}>
+        {!showHistory && (
           <button
-            onClick={handleUploadAll}
-            style={buttonStyle("#007bff")}
+            onClick={() => setShowHistory(true)}
+            style={buttonStyle("#3672e4ff")}
             onMouseEnter={handleHover}
             onMouseLeave={handleLeave}
           >
-            Upload & OCR
+            Show History
           </button>
-        </div>
-      )}
-
-      {/* Current uploads */}
-      <div style={{ maxWidth: "700px", margin: "auto" }}>
-        {files.map((fileObj, index) => (
-          <div
-            key={index}
-            style={{
-              border: "2px solid #a39c9c",
-              padding: "1rem",
-              marginBottom: "0.5rem",
-              borderRadius: "15px",
-              backgroundColor:
-                fileObj.status === "done"
-                  ? "#e6ffed"
-                  : fileObj.status === "error"
-                  ? "#ffe6e6"
-                  : "#fff",
-            }}
-          >
-            <strong>{fileObj.file.name}</strong>
-            <div>
-              Status:{" "}
-              <strong
-                style={{
-                  color:
-                    fileObj.status === "done"
-                      ? "green"
-                      : fileObj.status === "uploading"
-                      ? "blue"
-                      : "red",
-                }}
-              >
-                {fileObj.status}
-              </strong>
-            </div>
-
-            {fileObj.status === "uploading" && (
-              <div
-                style={{
-                  marginTop: "0.5rem",
-                  height: "12px",
-                  width: "100%",
-                  backgroundColor: "#ddd",
-                  borderRadius: "6px",
-                }}
-              >
-                <div
-                  style={{
-                    width: `${fileObj.progress}%`,
-                    height: "100%",
-                    backgroundColor: "#007bff",
-                    transition: "width 0.3s",
-                  }}
-                ></div>
-              </div>
-            )}
-
-            {fileObj.result && (
-              <div
-                style={{
-                  marginTop: "0.5rem",
-                  display: "flex",
-                  gap: "10px",
-                  flexWrap: "wrap",
-                }}
-              >
-                {["pdf", "txt", "docx"].map((type) => (
-                  <a
-                    key={type}
-                    href={fileObj.result[type]}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={buttonStyle(
-                      type === "pdf"
-                        ? "#007bff"
-                        : type === "txt"
-                        ? "#28a745"
-                        : "#ff8c00"
-                    )}
-                    onMouseEnter={handleHover}
-                    onMouseLeave={handleLeave}
-                  >
-                    {type.toUpperCase()}
-                  </a>
-                ))}
-                {fileObj.status === "error" && (
-                  <button
-                    onClick={() => uploadFile(fileObj, index)}
-                    style={buttonStyle("#dc3545")}
-                    onMouseEnter={handleHover}
-                    onMouseLeave={handleLeave}
-                  >
-                    Retry
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+        )}
       </div>
 
-      {/* History toggle */}
+      {/* Main content container (blurred when history modal is active) */}
       <div
         style={{
-          textAlign: "left",
-          marginTop: "2rem",
-          marginBottom: "1rem",
+          filter: showHistory ? "blur(5px)" : "none",
+          transition: "filter 0.3s",
         }}
       >
-        <button
-          onClick={() => setShowHistory(!showHistory)}
-          style={buttonStyle("#3672e4ff")}
-          onMouseEnter={handleHover}
-          onMouseLeave={handleLeave}
+        {/* Dropzone */}
+        <div
+          {...getRootProps()}
+          style={{
+            border: "2px dashed #007bff",
+            borderRadius: "95px",
+            padding: "2rem",
+            textAlign: "center",
+            maxWidth: "300px",
+            minHeight: "40px",
+            margin: "auto",
+            backgroundColor: isDragActive ? "#2f73b3ff" : "#edf1f5ff",
+            cursor: "pointer",
+            marginBottom: "1.5rem",
+          }}
         >
-          {showHistory ? "Hide History" : "Show History"}
-        </button>
+          <input {...getInputProps()} />
+          {isDragActive ? (
+            <p>Drop PDFs here...</p>
+          ) : (
+            <p>Drag & drop or Click to select files</p>
+          )}
+        </div>
+
+        {/* Current uploads */}
+        <div style={{ maxWidth: "700px", margin: "auto" }}>
+          {files.map((fileObj, index) => (
+            <div
+              key={index}
+              style={{
+                border: "2px solid #db8d8dff",
+                padding: "1rem",
+                marginBottom: "0.5rem",
+                borderRadius: "15px",
+                backgroundColor:
+                  fileObj.status === "done"
+                    ? "#e6ffed"
+                    : fileObj.status === "error"
+                    ? "#ffe6e6"
+                    : "#fff",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <strong>{fileObj.file.name}</strong>
+
+                {/* Inline Upload & OCR button */}
+                {(fileObj.status === "pending" || fileObj.status === "error") && (
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                  >
+                    <button
+                      onClick={() => uploadFile(fileObj, index)}
+                      style={buttonStyle("#007bff")}
+                      onMouseEnter={handleHover}
+                      onMouseLeave={handleLeave}
+                    >
+                      Perform OCR
+                    </button>
+
+                    {fileObj.status === "uploading" && (
+                      <div
+                        style={{
+                          width: "60px",
+                          height: "10px",
+                          border: "1px solid #007bff",
+                          borderRadius: "5px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${fileObj.progress}%`,
+                            height: "100%",
+                            backgroundColor: "#14b90eff",
+                            transition: "width 0.3s",
+                          }}
+                        ></div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                Status:{" "}
+                <strong
+                  style={{
+                    color:
+                      fileObj.status === "done"
+                        ? "green"
+                        : fileObj.status === "uploading"
+                        ? "blue"
+                        : "red",
+                  }}
+                >
+                  {fileObj.status}
+                </strong>
+              </div>
+
+              {fileObj.result && (
+                <div
+                  style={{
+                    marginTop: "0.5rem",
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {["pdf", "txt", "docx"].map((type) => {
+                    const color =
+                      type === "pdf"
+                        ? "#1f65afff"
+                        : type === "txt"
+                        ? "#3b7c4bff"
+                        : "#c78d47ff";
+
+                    const fileName = `${fileObj.file.name.replace(
+                      /\.[^/.]+$/,
+                      ""
+                    )}.${type}`;
+
+                    return (
+                      <div
+                        key={type}
+                        style={{ display: "flex", alignItems: "center", gap: "5px" }}
+                      >
+                        <a
+                          href={fileObj.result[type]}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={buttonStyle(color)}
+                          onMouseEnter={handleHover}
+                          onMouseLeave={handleLeave}
+                        >
+                          View {type.toUpperCase()}
+                        </a>
+
+                        {/* Emoji download */}
+                        <span
+                          onClick={() => handleDownload(fileObj.result[type], fileName)}
+                          style={{
+                            cursor: "pointer",
+                            fontSize: "1.5rem",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                          title={`Download (${type.toUpperCase()})`}
+                          onMouseEnter={(e) => (e.target.style.transform = "scale(1.2)")}
+                          onMouseLeave={(e) => (e.target.style.transform = "scale(1)")}
+                        >
+                          ⬇️
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  {fileObj.status === "error" && (
+                    <button
+                      onClick={() => uploadFile(fileObj, index)}
+                      style={buttonStyle("#dc3545")}
+                      onMouseEnter={handleHover}
+                      onMouseLeave={handleLeave}
+                    >
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* History List */}
-      {showHistory && <HistoryList history={history} onDelete={handleDelete} />}
+      {/* History Modal */}
+      {showHistory && (
+        <div
+          style={{
+            position: "fixed",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "80%",
+            maxWidth: "700px",
+            maxHeight: "500px",
+            backgroundColor: "#fff",
+            borderRadius: "15px",
+            padding: "1rem 2rem",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+            zIndex: 1000,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h2>Upload History</h2>
+            <button
+              onClick={() => setShowHistory(false)}
+              style={buttonStyle("#3672e4ff")}
+              onMouseEnter={handleHover}
+              onMouseLeave={handleLeave}
+            >
+              Hide History
+            </button>
+          </div>
+          <HistoryList history={history} onDelete={handleDelete} />
+        </div>
+      )}
     </div>
   );
 }
