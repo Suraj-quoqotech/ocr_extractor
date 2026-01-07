@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+build/
+
+# React
+.env
+
+# Python / Django
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+venv/
+
+# Django media
+media/uploads/
+media/outputs/
+
+# OS
+.DS_Store
