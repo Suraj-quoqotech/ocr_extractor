@@ -9,7 +9,7 @@ venv/
 db.sqlite3
 media/uploads/
 media/outputs/
-
+backend/ocr_project/media/
 # Node
 node_modules/
 build/
