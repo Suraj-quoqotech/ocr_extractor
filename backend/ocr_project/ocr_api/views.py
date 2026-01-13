@@ -5,7 +5,6 @@ from django.conf import settings
 from pathlib import Path
 import os
 import json
-
 from mistralai import Mistral
 from dotenv import load_dotenv
 from reportlab.lib.pagesizes import A4
@@ -31,7 +30,7 @@ class OCRUploadView(APIView):
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({"error": "No file uploaded"}, status=400)
-
+        processing_time = int(request.POST.get("processing_time", 0))
         # Get selected output formats from request
         output_formats_json = request.POST.get('output_formats', '["pdf", "txt", "docx"]')
         try:
@@ -133,7 +132,6 @@ class OCRUploadView(APIView):
             docx_size = docx_path.stat().st_size
             response_data['docx'] = docx_url
             response_data['docx_size'] = docx_size
-
         # Save to DB
         ocr_file, created = OCRFile.objects.update_or_create(
             file_name=file_obj.name,
@@ -144,7 +142,8 @@ class OCRUploadView(APIView):
                 "pdf_size": pdf_size,
                 "txt_size": txt_size,
                 "docx_size": docx_size,
-                "status": "done"
+                "status": "done",
+                "processing_time": processing_time
             }
         )
 
@@ -155,19 +154,23 @@ class OCRHistoryView(APIView):
     def get(self, request):
         files = OCRFile.objects.all().order_by('-uploaded_at')  # newest first
         data = [
-            {
-                "file_name": f.file_name,
-                "pdf_url": f.pdf_url if f.pdf_url else None,
-                "txt_url": f.txt_url if f.txt_url else None,
-                "docx_url": f.docx_url if f.docx_url else None,
-                "pdf_size": f.pdf_size,
-                "txt_size": f.txt_size,
-                "docx_size": f.docx_size,
-                "uploaded_at": f.uploaded_at,
-                "status": f.status,
-            }
-            for f in files
-        ]
+        {
+            "file_name": f.file_name,
+            "pdf_url": f.pdf_url if f.pdf_url else None,
+            "txt_url": f.txt_url if f.txt_url else None,
+            "docx_url": f.docx_url if f.docx_url else None,
+            "pdf_size": f.pdf_size,
+            "txt_size": f.txt_size,
+            "docx_size": f.docx_size,
+            "uploaded_at": f.uploaded_at,
+            "status": f.status,
+
+            # ✅ REQUIRED FOR ANALYTICS
+            "processing_time": f.processing_time,
+        }
+        for f in files
+    ]
+
         return Response(data)
 
 

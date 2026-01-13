@@ -12,7 +12,6 @@ const Analytics = ({ history, theme }) => {
     const now = new Date();
     const ranges = {
       '7': 7,
-      '15': 15,
       '30': 30,
       '90': 90,
       'all': Infinity
@@ -61,27 +60,29 @@ const Analytics = ({ history, theme }) => {
 
     // Filter and group history by date
     history.forEach(file => {
-      const fileDate = new Date(file.uploaded_at);
-      fileDate.setHours(0, 0, 0, 0);
-      
-      // Only include files within range
-      if (fileDate >= startDate && fileDate <= endDate) {
-        const dateKey = fileDate.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          year: dateRange === 'all' ? 'numeric' : undefined
-        });
-        
-        if (allDates[dateKey]) {
-          allDates[dateKey].total += 1;
-          if (file.status === 'done') {
-            allDates[dateKey].success += 1;
-          } else if (file.status === 'error') {
-            allDates[dateKey].failed += 1;
-          }
-        }
-      }
+  const fileDate = new Date(file.uploaded_at);
+  fileDate.setHours(0, 0, 0, 0);
+
+  if (fileDate >= startDate && fileDate <= endDate) {
+    const dateKey = fileDate.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: dateRange === 'all' ? 'numeric' : undefined
     });
+
+    if (allDates[dateKey]) {
+      allDates[dateKey].total += 1;
+
+      if (file.status === 'done') {
+        allDates[dateKey].success += 1;
+      } else if (file.status === 'error') {
+        allDates[dateKey].failed += 1;
+      }
+    }
+  }
+});
+
+
 
     // Convert to array and sort by timestamp
     return Object.values(allDates)
@@ -106,6 +107,7 @@ const Analytics = ({ history, theme }) => {
     const rangeSuccess = chartData.reduce((sum, day) => sum + day.success, 0);
     const rangeFailed = chartData.reduce((sum, day) => sum + day.failed, 0);
 
+    // Calculate average processing time (in seconds)
     return {
       total,
       success,
@@ -113,9 +115,88 @@ const Analytics = ({ history, theme }) => {
       successRate,
       rangeTotal,
       rangeSuccess,
-      rangeFailed
+      rangeFailed,
     };
   }, [history, chartData]);
+
+  // Processing time chart data
+  const processingTimeData = useMemo(() => {
+    const now = new Date();
+    const ranges = {
+      '7': 7,
+      '15': 15,
+      '30': 30,
+      '90': 90,
+      'all': Infinity
+    };
+
+    const daysToShow = ranges[dateRange];
+    
+    let startDate;
+    if (daysToShow === Infinity && history.length > 0) {
+      const earliestDate = new Date(
+        Math.min(...history.map(file => new Date(file.uploaded_at).getTime()))
+      );
+      startDate = new Date(earliestDate);
+      startDate.setHours(0, 0, 0, 0);
+    } else {
+      startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - daysToShow);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    const endDate = new Date(now);
+    endDate.setHours(0, 0, 0, 0);
+
+    // Create all dates with zero/null values
+    const allDates = {};
+    const currentDate = new Date(startDate);
+    
+    while (currentDate <= endDate) {
+      const dateKey = currentDate.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        year: dateRange === 'all' ? 'numeric' : undefined
+      });
+      
+      allDates[dateKey] = {
+        date: dateKey,
+        avgTime: 0,
+        count: 0,
+        totalTime: 0,
+        timestamp: currentDate.getTime()
+      };
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    // Calculate average processing time per day
+    history.forEach(file => {
+      const fileDate = new Date(file.uploaded_at);
+      fileDate.setHours(0, 0, 0, 0);
+
+       if (fileDate >= startDate && fileDate <= endDate && typeof file.processing_time === "number" && file.processing_time > 0) {
+        const dateKey = fileDate.toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          year: dateRange === 'all' ? 'numeric' : undefined
+        });
+        
+        if (allDates[dateKey]) {
+          allDates[dateKey].totalTime += file.processing_time;
+          allDates[dateKey].count += 1;
+        }
+      }
+    });
+
+    // Calculate averages and convert to seconds
+    return Object.values(allDates)
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .map(({ date, totalTime, count }) => ({
+        date,
+        avgTime: count > 0 ? parseFloat((totalTime / count / 1000).toFixed(2)) : 0
+      }));
+  }, [history, dateRange]);
 
   // Export as PNG
   const exportAsPNG = async () => {
@@ -281,7 +362,6 @@ const Analytics = ({ history, theme }) => {
               }}
             >
               <option value="7">Last 7 Days</option>
-              <option value="15">Last 15 Days</option>
               <option value="30">Last 30 Days</option>
               <option value="90">Last 3 Months</option>
               <option value="all">All Time</option>
@@ -357,7 +437,7 @@ const Analytics = ({ history, theme }) => {
           }}
         >
           <div style={{ fontSize: '0.875rem', color: theme === 'dark' ? '#888' : '#666', marginBottom: '0.5rem' }}>
-            Total Documents
+            Total Documents (Range)
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 700, color: '#5b7fff' }}>
             {stats.rangeTotal}
@@ -376,7 +456,7 @@ const Analytics = ({ history, theme }) => {
           }}
         >
           <div style={{ fontSize: '0.875rem', color: theme === 'dark' ? '#888' : '#666', marginBottom: '0.5rem' }}>
-            Successful
+            Successful (Range)
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 700, color: '#28a745' }}>
             {stats.rangeSuccess}
@@ -395,7 +475,7 @@ const Analytics = ({ history, theme }) => {
           }}
         >
           <div style={{ fontSize: '0.875rem', color: theme === 'dark' ? '#888' : '#666', marginBottom: '0.5rem' }}>
-            Failed
+            Failed (Range)
           </div>
           <div style={{ fontSize: '2rem', fontWeight: 700, color: '#dc3545' }}>
             {stats.rangeFailed}
@@ -551,6 +631,75 @@ const Analytics = ({ history, theme }) => {
             </ResponsiveContainer>
           )}
         </div>
+      </div>
+
+      {/* Chart 3 - Processing Time (Full Width) */}
+      <div
+        style={{
+          backgroundColor: theme === 'dark' ? '#1e1e1e' : '#fff',
+          borderRadius: '12px',
+          padding: '1.5rem',
+          marginBottom: '1.5rem',
+          boxShadow: theme === 'dark'
+            ? '0 1px 3px rgba(255,255,255,0.1)'
+            : '0 1px 3px rgba(0,0,0,0.1)'
+        }}
+      >
+        <h3
+          style={{
+            margin: '0 0 1.5rem 0',
+            fontSize: '1.125rem',
+            fontWeight: 600,
+            color: theme === 'dark' ? '#e0e0e0' : '#333'
+          }}
+        >
+          ⏱️ Processing Time Per Document
+        </h3>
+
+        {processingTimeData.length === 0 || processingTimeData.every(d => d.avgTime === 0) ? (
+          <div
+            style={{
+              textAlign: 'center',
+              padding: '3rem',
+              color: theme === 'dark' ? '#666' : '#999'
+            }}
+          >
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏱️</div>
+            <div>No processing time data available</div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={processingTimeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barSize={60}>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke={theme === 'dark' ? '#333' : '#e0e0e0'} 
+              />
+              <XAxis 
+                dataKey="date" 
+                stroke={theme === 'dark' ? '#888' : '#666'}
+                style={{ fontSize: '0.75rem' }}
+              />
+              <YAxis 
+                stroke={theme === 'dark' ? '#888' : '#666'}
+                style={{ fontSize: '0.75rem' }}
+                label={{ 
+                  value: 'Time (seconds)', 
+                  angle: -90, 
+                  position: 'insideLeft',
+                  style: { fill: theme === 'dark' ? '#888' : '#666', fontSize: '0.75rem' }
+                }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                wrapperStyle={{ 
+                  color: theme === 'dark' ? '#e0e0e0' : '#333',
+                  fontSize: '0.875rem'
+                }}
+              />
+              <Bar dataKey="avgTime" fill="#17a2b8" name="Avg Time (seconds)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       {/* Footer Info */}

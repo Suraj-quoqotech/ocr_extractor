@@ -16,6 +16,6 @@ class OCRFile(models.Model):
     docx_size = models.BigIntegerField(default=0)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
-
+    processing_time = models.IntegerField(null=True, blank=True)  # in milliseconds
     def __str__(self):
         return self.file_name
