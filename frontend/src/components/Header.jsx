@@ -45,7 +45,7 @@ const Header = ({ setShowSettings, theme, history, onLogout }) => {
         {isAuthenticated ? (
           <>
             <UserProfile theme={theme} history={history} onLogout={onLogout} />
-            <button onClick={() => onLogout && onLogout()} style={{ padding: '6px 10px', backgroundColor: '#ff4d4d', color: '#fff', border: 'none', borderRadius: '34px' }}>Logout</button>
+            <button onClick={() => onLogout && onLogout()} style={{ padding: '6px 10px', backgroundColor: '#ff4d4d', cursor: 'pointer', color: '#fff', border: 'none', borderRadius: '34px' }}>Logout</button>
           </>
         ) : (
           <div style={{ display: 'flex', gap: '0.5rem' }}>

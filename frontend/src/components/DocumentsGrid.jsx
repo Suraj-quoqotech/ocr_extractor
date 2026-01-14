@@ -31,6 +31,8 @@ const DocumentsGrid = ({
 
   const isDark = theme === "dark";
 
+  const [localSearch, setLocalSearch] = useState(searchTerm || '');
+
   // Toggle selection
   const handleSelectDoc = (fileName) => {
     setSelectedDocs(prev =>
@@ -40,12 +42,12 @@ const DocumentsGrid = ({
     );
   };
 
-  // Select all
-  const handleSelectAll = () => {
-    if (selectedDocs.length === filteredHistory.length) {
+  // Select all (operates on visible, filtered items)
+  const handleSelectAll = (visibleItems) => {
+    if (selectedDocs.length === visibleItems.length) {
       setSelectedDocs([]);
     } else {
-      setSelectedDocs(filteredHistory.map(f => f.file_name));
+      setSelectedDocs(visibleItems.map(f => f.file_name));
     }
   };
 
@@ -120,6 +122,22 @@ const DocumentsGrid = ({
       setIsDownloading(false);
     }
   };
+
+  const localFilteredHistory = (() => {
+    const term = (localSearch || '').toLowerCase();
+    const localFiltered = (filteredHistory || []).slice().filter(f => f.file_name.toLowerCase().includes(term));
+
+    // sort
+    localFiltered.sort((a, b) => {
+      if (sortBy === "date_desc") return new Date(b.uploaded_at) - new Date(a.uploaded_at);
+      if (sortBy === "date_asc") return new Date(a.uploaded_at) - new Date(b.uploaded_at);
+      if (sortBy === "name_asc") return a.file_name.localeCompare(b.file_name);
+      if (sortBy === "name_desc") return b.file_name.localeCompare(a.file_name);
+      return 0;
+    });
+
+    return localFiltered;
+  })();
 
   return (
     <div
@@ -216,12 +234,12 @@ const DocumentsGrid = ({
                 fontWeight: 500
               }}
             >
-              <input
-                type="checkbox"
-                checked={selectedDocs.length === filteredHistory.length && filteredHistory.length > 0}
-                onChange={handleSelectAll}
-                style={{ cursor: "pointer", width: "16px", height: "16px" }}
-              />
+                <input
+                  type="checkbox"
+                  checked={selectedDocs.length === localFilteredHistory.length && localFilteredHistory.length > 0}
+                  onChange={() => handleSelectAll(localFilteredHistory)}
+                  style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                />
               Select All
             </label>
           )}
@@ -241,8 +259,8 @@ const DocumentsGrid = ({
             <input
               type="text"
               placeholder="Search documents..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               style={{
                 width: "50%",
                 padding: "0.5rem 0.75rem 0.5rem 2.5rem",
@@ -279,7 +297,7 @@ const DocumentsGrid = ({
 
         {/* Documents Grid */}
         <div style={{ flex: 1, overflowY: "auto" }}>
-          {filteredHistory.length === 0 ? (
+          {localFilteredHistory.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
@@ -298,7 +316,7 @@ const DocumentsGrid = ({
                 gap: "1.5rem"
               }}
             >
-              {filteredHistory.map((fileObj, idx) => {
+                {localFilteredHistory.map((fileObj, idx) => {
                 const isSelected = selectedDocs.includes(fileObj.file_name);
                 const completionTime = formatCompletionTime(fileObj.processing_time);
 
@@ -574,7 +592,7 @@ const DocumentsGrid = ({
           )}
         </div>
 
-        <div
+          <div
           style={{
             marginTop: "1rem",
             fontSize: "0.875rem",
@@ -584,7 +602,7 @@ const DocumentsGrid = ({
             alignItems: "center"
           }}
         >
-          <span>Showing {filteredHistory.length} documents</span>
+          <span>Showing {localFilteredHistory.length} documents</span>
           {selectedDocs.length > 0 && (
             <span style={{ color: "#5b7fff", fontWeight: 500 }}>
               {selectedDocs.length} selected

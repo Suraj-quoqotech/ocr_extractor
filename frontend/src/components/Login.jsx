@@ -28,8 +28,14 @@ export default function Login() {
         localStorage.setItem("access", access);
         localStorage.setItem("refresh", refresh);
         axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
-        // Reload the app so App's on-load logic picks up the token and fetches history
-        window.location.href = '/';
+        // Prime the authenticated user request so the first /auth/user/ won't be 401
+        try {
+          await axios.get(`${API_BASE}/auth/user/`);
+        } catch (e) {
+          // ignore - best effort
+        }
+        // Navigate via react-router so app state stays initialized
+        navigate('/', { replace: true });
       } else {
         setError("No access token in response");
       }
@@ -45,7 +51,7 @@ export default function Login() {
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#fff7ed,#eef2ff)' }}>
       <div style={{ width: 420, borderRadius: 12, boxShadow: '0 8px 24px rgba(16,24,40,0.06)', background: '#fff', padding: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <div style={{ width: 48, height: 48, borderRadius: 10, background: '#5b7fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>Q</div>
+          <div style={{ width: 48, height: 45, borderRadius: 10, background: '#5b7fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>Q</div>
           <div>
             <h2 style={{ margin: 0 }}>Welcome back</h2>
             <div style={{ fontSize: 13, color: '#666' }}>Sign in to continue to Quoqo-OCR</div>
@@ -55,7 +61,7 @@ export default function Login() {
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: 12 }}>
             <label style={{ display: 'block', fontSize: 13, marginBottom: 6 }}>Username</label>
-            <input name="username" value={form.username} onChange={handleChange} placeholder="Username" required style={{ width: '95%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e6e9ef' }} />
+            <input name="username" value={form.username} onChange={handleChange} placeholder="Username" required style={{ width: '95.7%', padding: '10px 12px', borderRadius: 8, border: '1px solid #e6e9ef' }} />
           </div>
 
           <div style={{ marginBottom: 12, position: 'relative' }}>
@@ -66,7 +72,7 @@ export default function Login() {
 
           {error && <div style={{ color: '#b00020', marginBottom: 8 }}>{error}</div>}
 
-          <button type="submit" disabled={loading} style={{ width: '100%', padding: '10px 14px', background: '#5b7fff', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+          <button type="submit" disabled={loading} style={{ display: 'block', width: 180, margin: '12px auto 0', padding: '10px 14px', background: '#5b7fff', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', textAlign: 'center' }}>
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
