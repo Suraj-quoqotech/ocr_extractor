@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+
+const API_BASE = 'http://127.0.0.1:8000/api/ocr';
 
 const UserProfile = ({ theme, history, onLogout }) => {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -6,13 +9,23 @@ const UserProfile = ({ theme, history, onLogout }) => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     localStorage.getItem('notificationsEnabled') === 'true' || false
   );
-  
-  // User info - you can replace this with actual user data from your auth system
-  const [userInfo] = useState({
-    username: 'USER01',
-    email: 'user@quoqo.com',
-    loginTime: new Date().toISOString()
-  });
+  const [userInfo, setUserInfo] = useState({ username: '', email: '', loginTime: new Date().toISOString() });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await axios.get(`${API_BASE}/auth/user/`);
+        setUserInfo({
+          username: res.data.username || '',
+          email: res.data.email || '',
+          loginTime: new Date().toISOString()
+        });
+      } catch (err) {
+        console.error('Failed to fetch user info', err);
+      }
+    };
+    fetchUser();
+  }, []);
 
   // Session timer
   useEffect(() => {
@@ -94,7 +107,20 @@ const UserProfile = ({ theme, history, onLogout }) => {
           e.currentTarget.style.transform = 'scale(1)';
         }}
       >
-        👤
+        <div style={{
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          backgroundColor: '#5b7fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontWeight: '600',
+          fontSize: '1rem'
+        }}>
+          {(userInfo.username && userInfo.username.charAt(0).toUpperCase()) || '?'}
+        </div>
         {/* Active indicator dot */}
         <span
           style={{

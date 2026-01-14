@@ -613,7 +613,7 @@ const Analytics = ({ history, theme }) => {
               color: theme === 'dark' ? '#e0e0e0' : '#333'
             }}
           >
-            ✅ Success vs ❌ Failed
+             Success vs Failed
           </h3>
 
           {chartData.length === 0 ? (

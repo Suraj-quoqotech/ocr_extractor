@@ -1,6 +1,8 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from django.conf import settings
 from pathlib import Path
 import os
@@ -13,6 +15,27 @@ from reportlab.lib.styles import getSampleStyleSheet
 from docx import Document
 
 from .models import OCRFile
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
+from django.conf import settings
+from pathlib import Path
+
+from rest_framework import status
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .serializers import RegisterSerializer
+from rest_framework.permissions import AllowAny
+
+from rest_framework.permissions import IsAuthenticated
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"msg":"user created"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Load API key from .env
 load_dotenv()
@@ -24,6 +47,8 @@ client = Mistral(api_key=API_KEY)
 
 
 class OCRUploadView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, format=None):
@@ -131,7 +156,7 @@ class OCRUploadView(APIView):
             docx_size = docx_path.stat().st_size
             response_data['docx'] = docx_url
             response_data['docx_size'] = docx_size
-        # Save to DB
+        # Save to DB and associate with requesting user
         ocr_file, created = OCRFile.objects.update_or_create(
             file_name=file_obj.name,
             defaults={
@@ -142,6 +167,7 @@ class OCRUploadView(APIView):
                 "txt_size": txt_size,
                 "docx_size": docx_size,
                 "status": "done",
+                "user": request.user,
             }
         )
 
@@ -149,8 +175,15 @@ class OCRUploadView(APIView):
 
 
 class OCRHistoryView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        files = OCRFile.objects.all().order_by('-uploaded_at')  # newest first
+        # Admin user (username 'Admin' or superuser) sees all files
+        if request.user.is_authenticated and (request.user.username == 'Admin' or request.user.is_superuser):
+            files = OCRFile.objects.all().order_by('-uploaded_at')
+        else:
+            files = OCRFile.objects.filter(user=request.user).order_by('-uploaded_at')
         data = [
         {
             "file_name": f.file_name,
@@ -170,10 +203,15 @@ class OCRHistoryView(APIView):
 
 
 class OCRDeleteView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
     def delete(self, request, filename):
         try:
             ocr_file = OCRFile.objects.get(file_name=filename)
-            
+            # Only owner or Admin/superuser can delete
+            if not (request.user.username == 'Admin' or request.user.is_superuser or ocr_file.user == request.user):
+                return Response({"error": "Forbidden"}, status=403)
             # Delete local files if they exist
             output_dir = Path(settings.MEDIA_ROOT) / "outputs"
             base_name = Path(filename).stem
@@ -189,3 +227,39 @@ class OCRDeleteView(APIView):
             return Response({"status": "deleted"})
         except OCRFile.DoesNotExist:
             return Response({"error": "File not found"}, status=404)
+
+
+class OCRDownloadView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, filename):
+        # optional query param ?ext=pdf|txt|docx
+        ext = request.GET.get('ext', 'txt')
+        ocr_file = get_object_or_404(OCRFile, file_name=filename)
+        # Check permissions
+        if not (request.user.username == 'Admin' or request.user.is_superuser or ocr_file.user == request.user):
+            return Response({"error": "Forbidden"}, status=403)
+
+        base_name = Path(filename).stem
+        output_dir = Path(settings.MEDIA_ROOT) / "outputs"
+        file_path = output_dir / f"ocr_{base_name}.{ext}"
+        if not file_path.exists():
+            raise Http404("File not found")
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=file_path.name)
+
+
+class UserProfileView(APIView):
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        data = {
+            "username": user.username,
+            "email": user.email,
+            "is_superuser": user.is_superuser,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        }
+        return Response(data)

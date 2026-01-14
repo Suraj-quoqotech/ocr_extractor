@@ -1,4 +1,6 @@
 from django.db import models
+from django.contrib.auth.models import User
+
 
 class OCRFile(models.Model):
     STATUS_CHOICES = [
@@ -16,5 +18,6 @@ class OCRFile(models.Model):
     docx_size = models.BigIntegerField(default=0)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
     def __str__(self):
         return self.file_name

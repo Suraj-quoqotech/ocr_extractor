@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "axios";
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Login from './components/Login';
+import Signup from './components/Signup';
 
 // Import Components
 import Sidebar from "./components/Sidebar";
@@ -42,9 +45,21 @@ function App() {
     docx: true
   });
 
+  // On app load, if access token exists set axios header and fetch history
   useEffect(() => {
-    fetchHistory();
+    const token = localStorage.getItem('access');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      fetchHistory();
+    }
   }, []);
+
+  const logout = () => {
+    localStorage.removeItem('access');
+    localStorage.removeItem('refresh');
+    delete axios.defaults.headers.common['Authorization'];
+    window.location.href = '/login';
+  };
 
   const fetchHistory = async () => {
   try {
@@ -247,13 +262,25 @@ function App() {
     );
   };
 
-  const handleDownload = async (url, filename) => {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+  const handleDownload = async (originalFilename, ext = 'txt', suggestedName = null) => {
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/download/${encodeURIComponent(originalFilename)}/?ext=${ext}`,
+        { responseType: 'blob' }
+      );
+      const blob = new Blob([res.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = suggestedName || `${originalFilename}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download failed', err);
+      alert('Download failed');
+    }
   };
 
   const formatSize = size => {
@@ -293,91 +320,105 @@ function App() {
     return 0;
   });
 
+  const RequireAuth = ({ children }) => {
+    const token = localStorage.getItem('access');
+    if (!token) return <Navigate to="/login" replace />;
+    return children;
+  };
+
   return (
-    <div style={{ display: "flex", height: "100vh", background: theme === "dark" ? "#121212" : "#f5f5f5" }}>
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/*" element={(
+        <RequireAuth>
+        <div style={{ display: "flex", height: "100vh", background: theme === "dark" ? "#121212" : "#f5f5f5" }}>
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <Header theme={theme} setShowSettings={setShowSettings} history={history} />
-        {activeTab === "upload" && (
-          <div style={{ padding: "2rem", display: "flex", gap: "2rem" }}>
-            <div style={{ flex: 1 }}>
-              <UploadArea
-                isDragging={isDragging}
-                handleDragOver={handleDragOver}
-                handleDragLeave={handleDragLeave}
-                handleDrop={handleDrop}
-                handleFileSelect={handleFileSelect}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+            <Header theme={theme} setShowSettings={setShowSettings} history={history} onLogout={logout} />
+            {activeTab === "upload" && (
+              <div style={{ padding: "2rem", display: "flex", gap: "2rem" }}>
+                <div style={{ flex: 1 }}>
+                  <UploadArea
+                    isDragging={isDragging}
+                    handleDragOver={handleDragOver}
+                    handleDragLeave={handleDragLeave}
+                    handleDrop={handleDrop}
+                    handleFileSelect={handleFileSelect}
+                    theme={theme}
+                  />
+                  <UploadQueue files={files} uploadFile={uploadFile} theme={theme} />
+                </div>
+
+                {/* Right sidebar with OCR Settings and Completion Time Card */}
+                <div style={{ width: 350, display: "flex", flexDirection: "column", gap: "0" }}>
+                  <OCRSettings
+                    outputFormats={outputFormats}
+                    handleFormatChange={handleFormatChange}
+                    theme={theme}
+                  />
+                  {/* ⏱️ Add Completion Time Card HERE */}
+                  <CompletionTimeCard files={history} theme={theme} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === "history" && (
+              <HistoryTable
+                filteredHistory={filteredHistory}
+                history={history}
+                selectedFiles={selectedFiles}
+                handleSelectAll={handleSelectAll}
+                handleSelectFile={handleSelectFile}
+                handleDownload={handleDownload}
+                handleDelete={handleDelete}
+                handleBulkDelete={handleBulkDelete}
+                formatDate={formatDate}
+                formatSize={formatSize}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                filterStatus={filterStatus}
+                setFilterStatus={setFilterStatus}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
                 theme={theme}
               />
-              <UploadQueue files={files} uploadFile={uploadFile} theme={theme} />
-            </div>
+            )}
 
-            {/* Right sidebar with OCR Settings and Completion Time Card */}
-            <div style={{ width: 350, display: "flex", flexDirection: "column", gap: "0" }}>
-              <OCRSettings
-                outputFormats={outputFormats}
-                handleFormatChange={handleFormatChange}
+            {activeTab === "documents" && (
+              <DocumentsGrid
+                filteredHistory={filteredHistory}
+                handleDownload={handleDownload}
+                handleDelete={handleDelete}
+                formatDate={formatDate}
+                formatSize={formatSize}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
                 theme={theme}
               />
-              {/* ⏱️ Add Completion Time Card HERE */}
-              <CompletionTimeCard files={history} theme={theme} />
-            </div>
+            )}
+
+            {activeTab === "analytics" && (
+              <Analytics history={history} theme={theme} />
+            )}
           </div>
-        )}
 
-        {activeTab === "history" && (
-          <HistoryTable
-            filteredHistory={filteredHistory}
-            history={history}
-            selectedFiles={selectedFiles}
-            handleSelectAll={handleSelectAll}
-            handleSelectFile={handleSelectFile}
-            handleDownload={handleDownload}
-            handleDelete={handleDelete}
-            handleBulkDelete={handleBulkDelete}
-            formatDate={formatDate}
-            formatSize={formatSize}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            filterStatus={filterStatus}
-            setFilterStatus={setFilterStatus}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
+          <SettingsModal
+            showSettings={showSettings}
+            setShowSettings={setShowSettings}
             theme={theme}
+            setTheme={setTheme}
+            showAbout={showAbout}
+            setShowAbout={setShowAbout}
           />
-        )}
-
-        {activeTab === "documents" && (
-          <DocumentsGrid
-            filteredHistory={filteredHistory}
-            handleDownload={handleDownload}
-            handleDelete={handleDelete}
-            formatDate={formatDate}
-            formatSize={formatSize}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            sortBy={sortBy}
-            setSortBy={setSortBy}
-            theme={theme}
-          />
-        )}
-
-        {activeTab === "analytics" && (
-          <Analytics history={history} theme={theme} />
-        )}
-      </div>
-
-      <SettingsModal
-        showSettings={showSettings}
-        setShowSettings={setShowSettings}
-        theme={theme}
-        setTheme={setTheme}
-        showAbout={showAbout}
-        setShowAbout={setShowAbout}
-      />
-    </div>
+        </div>
+        </RequireAuth>
+      )} />
+    </Routes>
   );
 }
 
-export default App;
+export default App; 

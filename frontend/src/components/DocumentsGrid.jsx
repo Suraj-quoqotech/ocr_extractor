@@ -244,7 +244,7 @@ const DocumentsGrid = ({
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
-                width: "100%",
+                width: "50%",
                 padding: "0.5rem 0.75rem 0.5rem 2.5rem",
                 border: `1px solid ${isDark ? "#333" : "#e0e0e0"}`,
                 borderRadius: "6px",
@@ -437,7 +437,8 @@ const DocumentsGrid = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDownload(
-                              fileObj.pdf_url,
+                              fileObj.file_name,
+                              'pdf',
                               fileObj.file_name.replace(/\.[^/.]+$/, "") + ".pdf"
                             );
                           }}
@@ -471,7 +472,8 @@ const DocumentsGrid = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDownload(
-                              fileObj.txt_url,
+                              fileObj.file_name,
+                              'txt',
                               fileObj.file_name.replace(/\.[^/.]+$/, "") + ".txt"
                             );
                           }}
@@ -505,7 +507,8 @@ const DocumentsGrid = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDownload(
-                              fileObj.docx_url,
+                              fileObj.file_name,
+                              'docx',
                               fileObj.file_name.replace(/\.[^/.]+$/, "") + ".docx"
                             );
                           }}
@@ -567,7 +570,7 @@ const DocumentsGrid = ({
                   </div>
                 );
               })}
-            </div>
+            </div>   
           )}
         </div>
 

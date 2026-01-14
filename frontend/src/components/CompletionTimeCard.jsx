@@ -64,7 +64,7 @@ const CompletionTimeCard = ({ files, theme }) => {
         }}
       >
         <span style={{ fontSize: "1rem" }}>⏱️</span>
-        Processing Statistics :
+        Processing Statistics
         <span style={{ fontSize: "0.75rem", color: isDark ? "#888" : "#666" }}> How fast are we?</span>
       </h3>
 

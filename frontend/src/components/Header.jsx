@@ -1,7 +1,11 @@
 import React from 'react';
 import UserProfile from './UserProfile';
+import { useNavigate } from 'react-router-dom';
 
 const Header = ({ setShowSettings, theme, history, onLogout }) => {
+  const navigate = useNavigate();
+  const isAuthenticated = !!localStorage.getItem('access');
+
   return (
     <header
       style={{
@@ -38,7 +42,18 @@ const Header = ({ setShowSettings, theme, history, onLogout }) => {
         </p>
       </div>
       <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-        <UserProfile theme={theme} history={history} onLogout={onLogout} />
+        {isAuthenticated ? (
+          <>
+            <UserProfile theme={theme} history={history} onLogout={onLogout} />
+            <button onClick={() => onLogout && onLogout()} style={{ padding: '6px 10px', backgroundColor: '#ff4d4d', color: '#fff', border: 'none', borderRadius: '34px' }}>Logout</button>
+          </>
+        ) : (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={() => navigate('/login')} style={{ padding: '6px 10px' }}>Log in</button>
+            <button onClick={() => navigate('/signup')} style={{ padding: '6px 10px' }}>Sign up</button>
+          </div>
+        )}
+
         <button
           onClick={() => setShowSettings(true)}
           style={{
@@ -46,7 +61,7 @@ const Header = ({ setShowSettings, theme, history, onLogout }) => {
             border: "none",
             cursor: "pointer",
             color: theme === "dark" ? "#e0e0e0" : "#666",
-            fontSize: "1.3rem",
+            fontSize: "1.5rem",
             transition: "transform 0.2s ease"
           }}
           onMouseEnter={(e) => {
@@ -56,7 +71,7 @@ const Header = ({ setShowSettings, theme, history, onLogout }) => {
             e.currentTarget.style.transform = "scale(1)";
           }}
         >
-          ⚙️
+          ⚙️ 
         </button>
       </div>
     </header>
