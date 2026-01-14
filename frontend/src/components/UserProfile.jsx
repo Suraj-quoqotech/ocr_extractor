@@ -73,17 +73,6 @@ const UserProfile = ({ theme, history, onLogout }) => {
     }
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    if (window.confirm('Are you sure you want to logout?')) {
-      // Clear any user data
-      localStorage.removeItem('notificationsEnabled');
-      // Call parent logout handler
-      if (onLogout) {
-        onLogout();
-      }
-    }
-  };
 
   return (
     <div style={{ position: 'relative' }}>

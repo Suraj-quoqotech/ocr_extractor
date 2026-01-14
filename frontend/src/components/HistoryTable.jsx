@@ -213,18 +213,7 @@ const HistoryTable = ({
                   color: theme === "dark" ? "#b0b0b0" : "#666"
                 }}
               >
-                Formats
-              </th>
-              <th
-                style={{
-                  padding: "0.75rem",
-                  textAlign: "left",
-                  fontSize: "0.875rem",
-                  fontWeight: 600,
-                  color: theme === "dark" ? "#b0b0b0" : "#666"
-                }}
-              >
-                Actions
+               Delete
               </th>
             </tr>
           </thead>
@@ -310,100 +299,6 @@ const HistoryTable = ({
                       Failed
                     </span>
                   )}
-                </td>
-                <td style={{ padding: "0.75rem" }}>
-                  <div style={{ display: "flex", gap: "0.25rem" }}>
-                    {fileObj.pdf_url && (
-                      <button
-                        onClick={() =>
-                          handleDownload(
-                            fileObj.pdf_url,
-                            fileObj.file_name.replace(/\.[^/.]+$/, "") + ".pdf"
-                          )
-                        }
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: "#007bff",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                          fontSize: "0.7rem",
-                          color: "#fff",
-                          fontWeight: 500,
-                          transition: "background-color 0.2s ease"
-                        }}
-                        title={`PDF (${formatSize(fileObj.pdf_size)})`}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#0056b3";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "#007bff";
-                        }}
-                      >
-                        PDF
-                      </button>
-                    )}
-                    {fileObj.txt_url && (
-                      <button
-                        onClick={() =>
-                          handleDownload(
-                            fileObj.txt_url,
-                            fileObj.file_name.replace(/\.[^/.]+$/, "") + ".txt"
-                          )
-                        }
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: "#28a745",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                          fontSize: "0.7rem",
-                          color: "#fff",
-                          fontWeight: 500,
-                          transition: "background-color 0.2s ease"
-                        }}
-                        title={`TXT (${formatSize(fileObj.txt_size)})`}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#218838";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "#28a745";
-                        }}
-                      >
-                        TXT
-                      </button>
-                    )}
-                    {fileObj.docx_url && (
-                      <button
-                        onClick={() =>
-                          handleDownload(
-                            fileObj.docx_url,
-                            fileObj.file_name.replace(/\.[^/.]+$/, "") + ".docx"
-                          )
-                        }
-                        style={{
-                          padding: "0.25rem 0.5rem",
-                          backgroundColor: "#e15717ff",
-                          border: "none",
-                          borderRadius: "4px",
-                          cursor: "pointer",
-                          fontSize: "0.7rem",
-                          color: "#fff",
-                          fontWeight: 500,
-                          transition: "background-color 0.2s ease"
-                        }}
-                        title={`DOCX (${formatSize(fileObj.docx_size)})`}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = "#c44a13";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = "#e15717ff";
-                        }}
-                      >
-                        DOCX
-                      </button>
-                    )}
-                  </div>
                 </td>
                 <td style={{ padding: "0.75rem" }}>
                   <button

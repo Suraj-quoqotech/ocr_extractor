@@ -11,14 +11,15 @@ import SettingsModal from "./components/SettingsModal";
 import HistoryTable from "./components/HistoryTable";
 import DocumentsGrid from "./components/DocumentsGrid";
 import Analytics from "./components/Analytics";
-import AverageProcessingTimeCard from "./components/AverageProcessingTimeCard";
+import CompletionTimeCard from "./components/CompletionTimeCard";
 
-// Notifications
+// Import notification helpers
 import {
   notifyUploadSuccess,
   notifyUploadError
 } from "./utils/notificationHelper";
 
+// API Base URL
 const API_BASE_URL = "http://127.0.0.1:8000/api/ocr";
 
 function App() {
@@ -45,32 +46,27 @@ function App() {
     fetchHistory();
   }, []);
 
-  /* ==============================
-     GLOBAL AVERAGE (SINGLE SOURCE)
-     ============================== */
-  const globalAvgProcessingTime = useMemo(() => {
-    const valid = history.filter(
-      f => typeof f.processing_time === "number" && f.processing_time > 0
+  const fetchHistory = async () => {
+  try {
+    const res = await axios.get(`${API_BASE_URL}/history/`);
+
+    const savedTimes = JSON.parse(
+      localStorage.getItem("processingTimes") || "{}"
     );
 
-    if (!valid.length) return null;
+    const enrichedHistory = res.data.map(file => ({
+      ...file,
+      processing_time: savedTimes[file.file_name] || null
+    }));
 
-    const total = valid.reduce((sum, f) => sum + f.processing_time, 0);
-    return Math.round(total / valid.length);
-  }, [history]);
+    setHistory(enrichedHistory);
+  } catch (err) {
+    console.error("Failed to fetch history", err);
+  }
+};
 
-  const fetchHistory = async () => {
-    try {
-      const res = await axios.get(`${API_BASE_URL}/history/`);
-      setHistory(res.data);
-    } catch (err) {
-      console.error("Failed to fetch history", err);
-    }
-  };
 
-  /* ==============================
-     DRAG & DROP
-     ============================== */
+  // Drag & Drop
   const handleDragOver = e => {
     e.preventDefault();
     setIsDragging(true);
@@ -100,121 +96,116 @@ function App() {
     setOutputFormats(next);
   };
 
-  /* ==============================
-     ADD FILES
-     ============================== */
+  // Add files to queue
   const addFiles = newFiles => {
-    const mapped = newFiles.map(file => ({
-      id: Date.now() + Math.random(),
+    const fileObjects = newFiles.map(file => ({
       file,
+      id: Date.now() + Math.random(),
       status: "pending",
       progress: 0,
       result: null,
-
-      // timing (frontend source of truth)
       startedAt: null,
-      finishedAt: null,
-      processingTime: null
+      finishedAt: null
     }));
 
-    setFiles(prev => [...prev, ...mapped]);
+    setFiles(prev => [...prev, ...fileObjects]);
   };
 
-  /* ==============================
-     UPLOAD FILE
-     ============================== */
   const uploadFile = async (fileObj, index) => {
-    const startTime = Date.now();
+  const startTime = Date.now(); // ⏱️ Start timer
 
+  setFiles(prev =>
+    prev.map((f, i) =>
+      i === index
+        ? { ...f, status: "uploading", progress: 0, startedAt: startTime }
+        : f
+    )
+  );
+
+  const formData = new FormData();
+  formData.append("file", fileObj.file);
+
+  const selectedFormats = Object.keys(outputFormats).filter(
+    key => outputFormats[key]
+  );
+  formData.append("output_formats", JSON.stringify(selectedFormats));
+
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/upload/`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: e => {
+          const percent = Math.round((e.loaded * 100) / e.total);
+          const capped = Math.min(percent * 0.25, 25);
+          setFiles(prev =>
+            prev.map((f, i) =>
+              i === index ? { ...f, progress: capped } : f
+            )
+          );
+        }
+      }
+    );
+
+    // UI stages
+    setFiles(prev =>
+      prev.map((f, i) =>
+        i === index ? { ...f, status: "processing", progress: 65 } : f
+      )
+    );
+    
+    setFiles(prev =>
+      prev.map((f, i) =>
+        i === index ? { ...f, status: "generating", progress: 85 } : f
+      )
+    );
+    
+    setFiles(prev =>
+      prev.map((f, i) =>
+        i === index ? { ...f, status: "finalizing", progress: 95 } : f
+      )
+    );
+
+    // ⏱️ Calculate completion time
+    const endTime = Date.now();
+    const processingTime = endTime - startTime;
+    const savedTimes = JSON.parse(localStorage.getItem('processingTimes') || '{}');
+    savedTimes[fileObj.file.name] = processingTime;
+    localStorage.setItem('processingTimes', JSON.stringify(savedTimes));
+    // Final update with completion time
     setFiles(prev =>
       prev.map((f, i) =>
         i === index
-          ? { ...f, status: "uploading", progress: 0, startedAt: startTime }
+          ? {
+              ...f,
+              status: "done",
+              progress: 100,
+              result: response.data,
+              finishedAt: endTime,
+              processingTime: processingTime
+            }
           : f
       )
     );
 
-    const formData = new FormData();
-    formData.append("file", fileObj.file);
-
-    const selectedFormats = Object.keys(outputFormats).filter(
-      k => outputFormats[k]
+    notifyUploadSuccess(fileObj.file.name);
+    fetchHistory();
+    
+  } catch (err) {
+    console.error("Upload failed", err);
+    
+    setFiles(prev =>
+      prev.map((f, i) =>
+        i === index ? { ...f, status: "error", progress: 0 } : f
+      )
     );
-    formData.append("output_formats", JSON.stringify(selectedFormats));
+    
+    notifyUploadError(fileObj.file.name);
+  }
+};
 
-    try {
-      const response = await axios.post(
-        `${API_BASE_URL}/upload/`,
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-          onUploadProgress: e => {
-            const percent = Math.round((e.loaded * 100) / e.total);
-            const capped = Math.min(percent * 0.25, 25);
-
-            setFiles(prev =>
-              prev.map((f, i) =>
-                i === index ? { ...f, progress: capped } : f
-              )
-            );
-          }
-        }
-      );
-
-      // visual phases
-      setFiles(prev =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "processing", progress: 65 } : f
-        )
-      );
-      setFiles(prev =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "generating", progress: 85 } : f
-        )
-      );
-      setFiles(prev =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "finalizing", progress: 95 } : f
-        )
-      );
-
-      // ⏱️ FINAL TIME — EXACTLY WHEN 100%
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-
-      setFiles(prev =>
-        prev.map((f, i) =>
-          i === index
-            ? {
-                ...f,
-                status: "done",
-                progress: 100,
-                finishedAt: endTime,
-                processingTime: duration,
-                result: response.data
-              }
-            : f
-        )
-      );
-
-      notifyUploadSuccess(fileObj.file.name);
-      fetchHistory();
-    } catch (err) {
-      console.error("Upload failed", err);
-
-      setFiles(prev =>
-        prev.map((f, i) =>
-          i === index ? { ...f, status: "error", progress: 0 } : f
-        )
-      );
-
-      notifyUploadError(fileObj.file.name);
-    }
-  };
-
-  /* ==============================
-     DELETE / BULK DELETE
-     ============================== */
+  // Delete
   const handleDelete = async filename => {
     try {
       await axios.delete(`${API_BASE_URL}/delete/${filename}/`);
@@ -224,8 +215,9 @@ function App() {
     }
   };
 
+  // Bulk delete
   const handleBulkDelete = async () => {
-    if (!selectedFiles.length) return alert("No files selected!");
+    if (!selectedFiles.length) return;
     if (!window.confirm(`Delete ${selectedFiles.length} file(s)?`)) return;
 
     try {
@@ -239,9 +231,31 @@ function App() {
     }
   };
 
-  /* ==============================
-     HELPERS
-     ============================== */
+  const handleSelectFile = filename => {
+    setSelectedFiles(prev =>
+      prev.includes(filename)
+        ? prev.filter(f => f !== filename)
+        : [...prev, filename]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelectedFiles(
+      selectedFiles.length === filteredHistory.length
+        ? []
+        : filteredHistory.map(f => f.file_name)
+    );
+  };
+
+  const handleDownload = async (url, filename) => {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+  };
+
   const formatSize = size => {
     if (!size) return "-";
     if (size < 1024) return `${size} B`;
@@ -249,8 +263,8 @@ function App() {
     return `${(size / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  const formatDate = dateString =>
-    new Date(dateString).toLocaleString("en-US", {
+  const formatDate = date =>
+    new Date(date).toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -259,30 +273,32 @@ function App() {
     });
 
   let filteredHistory = history.filter(file => {
-    const matchSearch = file.file_name
+    const matchesSearch = file.file_name
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchStatus =
+    const matchesStatus =
       filterStatus === "all" || file.status === filterStatus;
-    return matchSearch && matchStatus;
+    return matchesSearch && matchesStatus;
   });
 
-  /* ==============================
-     RENDER
-     ============================== */
+  filteredHistory.sort((a, b) => {
+    if (sortBy === "date_desc")
+      return new Date(b.uploaded_at) - new Date(a.uploaded_at);
+    if (sortBy === "date_asc")
+      return new Date(a.uploaded_at) - new Date(b.uploaded_at);
+    if (sortBy === "name_asc")
+      return a.file_name.localeCompare(b.file_name);
+    if (sortBy === "name_desc")
+      return b.file_name.localeCompare(a.file_name);
+    return 0;
+  });
+
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        backgroundColor: theme === "dark" ? "#121212" : "#f5f5f5"
-      }}
-    >
+    <div style={{ display: "flex", height: "100vh", background: theme === "dark" ? "#121212" : "#f5f5f5" }}>
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <Header theme={theme} history={history} setShowSettings={setShowSettings} />
-
+        <Header theme={theme} setShowSettings={setShowSettings} history={history} />
         {activeTab === "upload" && (
           <div style={{ padding: "2rem", display: "flex", gap: "2rem" }}>
             <div style={{ flex: 1 }}>
@@ -297,17 +313,15 @@ function App() {
               <UploadQueue files={files} uploadFile={uploadFile} theme={theme} />
             </div>
 
-            <div style={{ width: 350 }}>
+            {/* Right sidebar with OCR Settings and Completion Time Card */}
+            <div style={{ width: 350, display: "flex", flexDirection: "column", gap: "0" }}>
               <OCRSettings
                 outputFormats={outputFormats}
                 handleFormatChange={handleFormatChange}
                 theme={theme}
               />
-              <AverageProcessingTimeCard
-                avgTime={globalAvgProcessingTime}
-                totalDocs={history.filter(f => f.processing_time > 0).length}
-                theme={theme}
-              />
+              {/* ⏱️ Add Completion Time Card HERE */}
+              <CompletionTimeCard files={history} theme={theme} />
             </div>
           </div>
         )}
@@ -317,7 +331,9 @@ function App() {
             filteredHistory={filteredHistory}
             history={history}
             selectedFiles={selectedFiles}
-            setSelectedFiles={setSelectedFiles}
+            handleSelectAll={handleSelectAll}
+            handleSelectFile={handleSelectFile}
+            handleDownload={handleDownload}
             handleDelete={handleDelete}
             handleBulkDelete={handleBulkDelete}
             formatDate={formatDate}
@@ -335,9 +351,14 @@ function App() {
         {activeTab === "documents" && (
           <DocumentsGrid
             filteredHistory={filteredHistory}
+            handleDownload={handleDownload}
             handleDelete={handleDelete}
             formatDate={formatDate}
             formatSize={formatSize}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
             theme={theme}
           />
         )}

@@ -1,7 +1,18 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
 const Analytics = ({ history, theme }) => {
   const [dateRange, setDateRange] = useState('7'); // 7, 30, 90, all
@@ -129,6 +140,7 @@ const Analytics = ({ history, theme }) => {
       '90': 90,
       'all': Infinity
     };
+    
 
     const daysToShow = ranges[dateRange];
     
@@ -197,6 +209,20 @@ const Analytics = ({ history, theme }) => {
         avgTime: count > 0 ? parseFloat((totalTime / count / 1000).toFixed(2)) : 0
       }));
   }, [history, dateRange]);
+  const documentCompletionData = useMemo(() => {
+    return history
+      .filter(
+        f =>
+          f.status === "done" &&
+          typeof f.processing_time === "number" &&
+          f.processing_time > 0
+      )
+      .sort((a, b) => new Date(a.uploaded_at) - new Date(b.uploaded_at))
+      .map(f => ({
+        document: f.file_name,
+        completionTime: Math.round(f.processing_time / 1000) // seconds
+      }));
+  }, [history]);
 
   // Export as PNG
   const exportAsPNG = async () => {
@@ -633,13 +659,12 @@ const Analytics = ({ history, theme }) => {
         </div>
       </div>
 
-      {/* Chart 3 - Processing Time (Full Width) */}
+      {/* Chart 3 - Completion Time per Document */}
       <div
         style={{
           backgroundColor: theme === 'dark' ? '#1e1e1e' : '#fff',
           borderRadius: '12px',
           padding: '1.5rem',
-          marginBottom: '1.5rem',
           boxShadow: theme === 'dark'
             ? '0 1px 3px rgba(255,255,255,0.1)'
             : '0 1px 3px rgba(0,0,0,0.1)'
@@ -653,10 +678,10 @@ const Analytics = ({ history, theme }) => {
             color: theme === 'dark' ? '#e0e0e0' : '#333'
           }}
         >
-          ⏱️ Processing Time Per Document
+          ⏱️ Completion Time per Document
         </h3>
 
-        {processingTimeData.length === 0 || processingTimeData.every(d => d.avgTime === 0) ? (
+        {documentCompletionData.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -664,44 +689,48 @@ const Analytics = ({ history, theme }) => {
               color: theme === 'dark' ? '#666' : '#999'
             }}
           >
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⏱️</div>
-            <div>No processing time data available</div>
+            No completion time data available
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={processingTimeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barSize={60}>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke={theme === 'dark' ? '#333' : '#e0e0e0'} 
+            <LineChart data={documentCompletionData}>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                stroke={theme === 'dark' ? '#333' : '#e0e0e0'}
               />
-              <XAxis 
-                dataKey="date" 
-                stroke={theme === 'dark' ? '#888' : '#666'}
+
+              {/* X-axis: Document Names */}
+              <XAxis
+                dataKey="document"
+                angle={-30}
+                textAnchor="end"
+                interval={0}
+                height={80}
+                stroke={theme === 'dark' ? '#888' : '#030303'}
                 style={{ fontSize: '0.75rem' }}
               />
-              <YAxis 
-                stroke={theme === 'dark' ? '#888' : '#666'}
-                style={{ fontSize: '0.75rem' }}
-                label={{ 
-                  value: 'Time (seconds)', 
-                  angle: -90, 
-                  position: 'insideLeft',
-                  style: { fill: theme === 'dark' ? '#888' : '#666', fontSize: '0.75rem' }
-                }}
+
+              {/* Y-axis: Completion Time */}
+              <YAxis
+                stroke={theme === 'dark' ? '#e2d6d6' : '#030303'}
               />
-              <Tooltip content={<CustomTooltip />} />
-              <Legend 
-                wrapperStyle={{ 
-                  color: theme === 'dark' ? '#e0e0e0' : '#333',
-                  fontSize: '0.875rem'
-                }}
+
+              <Tooltip
+                formatter={(value) => [`${value}s`, 'Completion Time']}
+                labelFormatter={(label) => `Document: ${label}`}
               />
-              <Bar dataKey="avgTime" fill="#17a2b8" name="Avg Time (seconds)" radius={[4, 4, 0, 0]} />
-            </BarChart>
+
+              <Line
+                type="monotone"
+                dataKey="completionTime"
+                stroke="#dd3c37"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+              />
+            </LineChart>
           </ResponsiveContainer>
         )}
       </div>
-
       {/* Footer Info */}
       <div
         style={{

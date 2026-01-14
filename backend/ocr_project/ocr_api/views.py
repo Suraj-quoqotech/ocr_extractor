@@ -30,7 +30,6 @@ class OCRUploadView(APIView):
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({"error": "No file uploaded"}, status=400)
-        processing_time = int(request.POST.get("processing_time", 0))
         # Get selected output formats from request
         output_formats_json = request.POST.get('output_formats', '["pdf", "txt", "docx"]')
         try:
@@ -143,7 +142,6 @@ class OCRUploadView(APIView):
                 "txt_size": txt_size,
                 "docx_size": docx_size,
                 "status": "done",
-                "processing_time": processing_time
             }
         )
 
@@ -164,9 +162,6 @@ class OCRHistoryView(APIView):
             "docx_size": f.docx_size,
             "uploaded_at": f.uploaded_at,
             "status": f.status,
-
-            # ✅ REQUIRED FOR ANALYTICS
-            "processing_time": f.processing_time,
         }
         for f in files
     ]
