@@ -24,10 +24,15 @@ export default function Login() {
 
       // Expected { access, refresh }
       const { access, refresh } = res.data;
-      if (access) {
+       if (access) {
         localStorage.setItem("access", access);
         localStorage.setItem("refresh", refresh);
+
+        // ✅ ADD THIS LINE
+        localStorage.setItem("username", form.username);
+
         axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+
         
         // Fetch user profile to ensure data is ready when app loads
         try {

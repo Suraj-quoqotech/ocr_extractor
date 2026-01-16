@@ -17,6 +17,8 @@ import DocumentsGrid from "./components/DocumentsGrid";
 import Analytics from "./components/Analytics";
 import CompletionTimeCard from "./components/CompletionTimeCard";
 import Users from "./components/Users";
+import Chats from './components/Chats';
+
 
 // Import notification helpers
 import {
@@ -453,6 +455,11 @@ function App() {
             {activeTab === "users" && (
               <Users theme={theme} />
             )}
+
+            {activeTab === "chats" && (
+              <Chats theme={theme} />
+            )}
+
           </div>
 
           <SettingsModal

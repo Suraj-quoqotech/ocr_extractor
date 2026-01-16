@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-
+from .models import ChatRoom, Message
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -107,3 +107,39 @@ class ChangePasswordSerializer(serializers.Serializer):
         if data['new_password'] != data['confirm_password']:
             raise serializers.ValidationError({"new_password": "New passwords do not match"})
         return data
+    
+from django.contrib.auth.models import User
+from .models import ChatRoom, Message
+
+
+class ChatUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username')
+
+
+class ChatRoomSerializer(serializers.ModelSerializer):
+    user1 = ChatUserSerializer()
+    user2 = ChatUserSerializer()
+
+    class Meta:
+        model = ChatRoom
+        fields = ('id', 'user1', 'user2', 'created_at')
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_username = serializers.CharField(source="sender.username", read_only=True)
+
+    class Meta:
+        model = Message
+        fields = [
+            "id",
+            "room",
+            "sender",
+            "sender_username",
+            "content",
+            "created_at",
+            "edited_at",
+            "is_edited",
+            "is_deleted_for_everyone",
+        ]

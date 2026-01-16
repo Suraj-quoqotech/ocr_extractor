@@ -5,8 +5,21 @@ from django.db.models import Sum, Count, Q
 from django.utils.dateformat import format as date_format
 from .models import OCRFile, UserProfile
 from datetime import datetime
+from .models import ChatRoom, Message
 
 
+@admin.register(ChatRoom)
+class ChatRoomAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user1', 'user2', 'created_at')
+    search_fields = ('user1__username', 'user2__username')
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'room', 'sender', 'created_at', 'is_read')
+    search_fields = ('sender__username', 'content')
+    list_filter = ('is_read',)
+
+    
 class OCRFileInline(admin.TabularInline):
     model = OCRFile
     extra = 0

@@ -15,6 +15,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from docx import Document
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from .models import OCRFile
 from django.http import FileResponse, Http404
@@ -25,6 +26,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import RegisterSerializer
 from rest_framework.permissions import AllowAny
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.contrib.auth.models import User
+from .models import ChatRoom, Message
+from .serializers import ChatUserSerializer, ChatRoomSerializer, MessageSerializer
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -460,3 +468,138 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         if username and not User.objects.filter(username=username).exists():
             return Response({"detail": "Your account has been deleted by the admin."}, status=401)
         return super().post(request, *args, **kwargs)
+    
+# ===========================
+# CHAT APIs
+# ===========================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def chat_users(request):
+    """
+    List all users except the logged-in user
+    """
+    users = User.objects.exclude(id=request.user.id)
+    serializer = ChatUserSerializer(users, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def get_or_create_chat_room(request):
+    """
+    Get or create a 1-to-1 chat room
+    """
+    other_user_id = request.data.get('user_id')
+
+    if not other_user_id:
+        return Response({"error": "user_id is required"}, status=400)
+
+    try:
+        other_user = User.objects.get(id=other_user_id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=404)
+
+    room = ChatRoom.get_or_create_room(request.user, other_user)
+    serializer = ChatRoomSerializer(room)
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def chat_messages(request, room_id):
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if request.method == 'GET':
+        messages = (
+            Message.objects
+            .filter(room=room)
+            .exclude(deleted_for=request.user)
+            .order_by('created_at')
+        )
+
+        serializer = MessageSerializer(
+            messages,
+            many=True,
+            context={"request": request}
+        )
+        return Response(serializer.data)
+
+    # ==========================
+    # POST → SEND MESSAGE
+    # ==========================
+    elif request.method == 'POST':
+        content = request.data.get("content", "").strip()
+
+        if not content:
+            return Response(
+                {"error": "Message content cannot be empty"},
+                status=400
+            )
+
+        message = Message.objects.create(
+            room=room,
+            sender=request.user,
+            content=content
+        )
+
+        serializer = MessageSerializer(
+            message,
+            context={"request": request}
+        )
+
+        # ✅ THIS RETURN WAS MISSING
+        return Response(serializer.data, status=201)
+
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_message_for_everyone(request, message_id):
+    message = get_object_or_404(Message, id=message_id)
+
+    # 🔐 STRICT check
+    if message.sender_id != request.user.id and not request.user.is_superuser:
+        return Response({"error": "Forbidden"}, status=403)
+
+    message.is_deleted_for_everyone = True
+    message.content = "This message was deleted"
+    message.save(update_fields=["is_deleted_for_everyone", "content"])
+
+    return Response({"status": "deleted_for_everyone"})
+
+
+@api_view(["PUT"])
+@permission_classes([IsAuthenticated])
+def edit_message(request, message_id):
+    message = get_object_or_404(Message, id=message_id)
+
+    if message.sender != request.user:
+        return Response({"error": "Forbidden"}, status=403)
+
+    if message.is_deleted_for_everyone:
+        return Response({"error": "Cannot edit deleted message"}, status=400)
+
+    new_content = request.data.get("content", "").strip()
+    if not new_content:
+        return Response({"error": "Message cannot be empty"}, status=400)
+
+    message.content = new_content
+    message.is_edited = True
+    message.edited_at = timezone.now()
+    message.save()
+
+    return Response(MessageSerializer(message).data)
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_message_for_me(request, message_id):
+    """
+    Deletes a message only for the current user
+    """
+    message = get_object_or_404(Message, id=message_id)
+
+    # Add current user to deleted_for list
+    message.deleted_for.add(request.user)
+
+    return Response({"status": "deleted_for_me"})

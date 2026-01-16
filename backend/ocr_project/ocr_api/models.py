@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-
+from django.db.models import Q
 
 class UserProfile(models.Model):
     ROLE_CHOICES = [
@@ -45,3 +45,65 @@ class OCRFile(models.Model):
 
     def __str__(self):
         return self.file_name
+    
+class ChatRoom(models.Model):
+    """
+    Represents a 1-to-1 chat between two users.
+    """
+    user1 = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='chatrooms_as_user1'
+    )
+    user2 = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='chatrooms_as_user2'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user1', 'user2'],
+                name='unique_chat_room_pair'
+            )
+        ]
+
+    def __str__(self):
+        return f"ChatRoom({self.user1.username}, {self.user2.username})"
+
+    @staticmethod
+    def get_or_create_room(user_a, user_b):
+        """
+        Always return the same room for a user pair (order independent).
+        """
+        room = ChatRoom.objects.filter(
+            Q(user1=user_a, user2=user_b) |
+            Q(user1=user_b, user2=user_a)
+        ).first()
+
+        if room:
+            return room
+
+        return ChatRoom.objects.create(user1=user_a, user2=user_b)
+
+
+from django.utils import timezone
+
+class Message(models.Model):
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    content = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    edited_at = models.DateTimeField(null=True, blank=True)  # ✅ ADD THIS
+
+    is_read = models.BooleanField(default=False)
+    deleted_for = models.ManyToManyField(User, blank=True, related_name="deleted_messages")
+    is_deleted_for_everyone = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['room', '-created_at'])]
