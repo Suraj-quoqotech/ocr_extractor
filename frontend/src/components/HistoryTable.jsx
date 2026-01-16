@@ -114,7 +114,7 @@ const HistoryTable = ({
           </span>
           <input
             type="text"
-            placeholder="Search files..."
+            placeholder="Search files based on file-name or uploader..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             style={{

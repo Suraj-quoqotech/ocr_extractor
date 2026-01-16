@@ -5,7 +5,7 @@ const API_BASE = 'http://127.0.0.1:8000/api/ocr';
 
 const UserProfile = ({ theme, history, onLogout }) => {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [sessionTime, setSessionTime] = useState(0);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     localStorage.getItem('notificationsEnabled') === 'true' || false
   );
@@ -27,14 +27,7 @@ const UserProfile = ({ theme, history, onLogout }) => {
     fetchUser();
   }, []);
 
-  // Session timer
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSessionTime(prev => prev + 1);
-    }, 1000);
 
-    return () => clearInterval(interval);
-  }, []);
 
   // Request notification permission
   useEffect(() => {
@@ -44,14 +37,6 @@ const UserProfile = ({ theme, history, onLogout }) => {
       }
     }
   }, [notificationsEnabled]);
-
-  // Format session time
-  const formatSessionTime = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // Format login time
   const formatLoginTime = (isoString) => {
@@ -363,40 +348,6 @@ const UserProfile = ({ theme, history, onLogout }) => {
               </div>
             </div>
 
-            {/* Session Time */}
-            <div
-              style={{
-                padding: '1rem 1.5rem',
-                borderBottom: `1px solid ${theme === 'dark' ? '#333' : '#e0e0e0'}`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1rem' }}>⏱️</span>
-                <div>
-                  <div
-                    style={{
-                      fontSize: '0.75rem',
-                      color: theme === 'dark' ? '#888' : '#666'
-                    }}
-                  >
-                    Session Time
-                  </div>
-                  <div
-                    style={{
-                      fontSize: '0.875rem',
-                      fontWeight: 600,
-                      color: theme === 'dark' ? '#e0e0e0' : '#333',
-                      fontFamily: 'monospace'
-                    }}
-                  >
-                    {formatSessionTime(sessionTime)}
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Notifications Toggle */}
             <div

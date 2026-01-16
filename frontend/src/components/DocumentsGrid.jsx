@@ -266,7 +266,7 @@ const DocumentsGrid = ({
             </span>
             <input
               type="text"
-              placeholder="Search documents..."
+              placeholder="Search documents based on document-name or uploader..."
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
               style={{
