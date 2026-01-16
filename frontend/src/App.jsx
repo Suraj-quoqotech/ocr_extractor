@@ -3,6 +3,7 @@ import axios from "axios";
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import Signup from './components/Signup';
+import ForgotPassword from './components/ForgotPassword';
 
 // Import Components
 import Sidebar from "./components/Sidebar";
@@ -15,6 +16,7 @@ import HistoryTable from "./components/HistoryTable";
 import DocumentsGrid from "./components/DocumentsGrid";
 import Analytics from "./components/Analytics";
 import CompletionTimeCard from "./components/CompletionTimeCard";
+import Users from "./components/Users";
 
 // Import notification helpers
 import {
@@ -45,16 +47,54 @@ function App() {
     docx: true
   });
 
-  // On app load, if access token exists set axios header and fetch history
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // On app load, if access token exists set axios header and fetch user profile
   useEffect(() => {
     const token = localStorage.getItem('access');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      fetchHistory();
+      // Fetch user profile to get role and auth state
+      fetchUserProfile();
+    } else {
+      setAuthReady(true);
     }
   }, []);
 
+  // Watch for token changes and trigger auth check
+  useEffect(() => {
+    const handleTokenChange = setInterval(() => {
+      const token = localStorage.getItem('access');
+      if (token && !user) {
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        fetchUserProfile();
+      }
+    }, 500);
+
+    return () => clearInterval(handleTokenChange);
+  }, [user]);
+
+  // Fetch user profile
+  const fetchUserProfile = async () => {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/auth/user/`);
+      setUser(res.data);
+      // After user profile is loaded, fetch history
+      await fetchHistory();
+    } catch (err) {
+      console.error("Failed to fetch user profile", err);
+      // If auth fails, clear token
+      localStorage.removeItem('access');
+      localStorage.removeItem('refresh');
+      delete axios.defaults.headers.common['Authorization'];
+    } finally {
+      setAuthReady(true);
+    }
+  };
+
   const logout = () => {
+    setUser(null);
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
     delete axios.defaults.headers.common['Authorization'];
@@ -62,23 +102,23 @@ function App() {
   };
 
   const fetchHistory = async () => {
-  try {
-    const res = await axios.get(`${API_BASE_URL}/history/`);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/history/`);
 
-    const savedTimes = JSON.parse(
-      localStorage.getItem("processingTimes") || "{}"
-    );
+      const savedTimes = JSON.parse(
+        localStorage.getItem("processingTimes") || "{}"
+      );
 
-    const enrichedHistory = res.data.map(file => ({
-      ...file,
-      processing_time: savedTimes[file.file_name] || null
-    }));
+      const enrichedHistory = res.data.map(file => ({
+        ...file,
+        processing_time: savedTimes[file.file_name] || null
+      }));
 
-    setHistory(enrichedHistory);
-  } catch (err) {
-    console.error("Failed to fetch history", err);
-  }
-};
+      setHistory(enrichedHistory);
+    } catch (err) {
+      console.error("Failed to fetch history", err);
+    }
+  };
 
 
   // Drag & Drop
@@ -326,14 +366,19 @@ function App() {
     return children;
   };
 
+  if (!authReady) {
+    return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>Loading...</div>;
+  }
+
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/*" element={(
         <RequireAuth>
-        <div style={{ display: "flex", height: "100vh", background: theme === "dark" ? "#121212" : "#f5f5f5" }}>
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
+        <div style={{ display: "flex", minHeight: "100vh", background: theme === "dark" ? "#121212" : "#f5f5f5" }}>
+          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} user={user} />
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             <Header theme={theme} setShowSettings={setShowSettings} history={history} onLogout={logout} />
@@ -403,6 +448,10 @@ function App() {
 
             {activeTab === "analytics" && (
               <Analytics history={history} theme={theme} />
+            )}
+
+            {activeTab === "users" && (
+              <Users theme={theme} />
             )}
           </div>
 

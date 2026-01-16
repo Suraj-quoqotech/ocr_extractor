@@ -28,20 +28,32 @@ export default function Login() {
         localStorage.setItem("access", access);
         localStorage.setItem("refresh", refresh);
         axios.defaults.headers.common["Authorization"] = `Bearer ${access}`;
-        // Prime the authenticated user request so the first /auth/user/ won't be 401
+        
+        // Fetch user profile to ensure data is ready when app loads
         try {
           await axios.get(`${API_BASE}/auth/user/`);
         } catch (e) {
           // ignore - best effort
         }
+        
         // Navigate via react-router so app state stays initialized
-        navigate('/', { replace: true });
+        // Small delay to ensure localStorage is updated before App checks
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 100);
       } else {
         setError("No access token in response");
       }
     } catch (err) {
-      if (err.response && err.response.data) setError(JSON.stringify(err.response.data));
-      else setError(err.message);
+      if (err.response && err.response.data) {
+        if (err.response.data.detail === "Your account has been deleted by the admin.") {
+          setError("Your account has been deleted by the admin.");
+        } else {
+          setError("Invalid credentials, please check your username and password.");
+        }
+      } else {
+        setError("An error occurred. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -70,12 +82,33 @@ export default function Login() {
             <button type="button" onClick={() => setShowPassword(s => !s)} style={{ position: 'absolute', right: 8, top: 34, background: 'none', border: 'none', cursor: 'pointer', color: '#5b7fff' }}>{showPassword ? 'Hide' : 'Show'}</button>
           </div>
 
-          {error && <div style={{ color: '#b00020', marginBottom: 8 }}>{error}</div>}
+          <div style={{ textAlign: 'right', marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => navigate('/forgot-password')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#5b7fff',
+                cursor: 'pointer',
+                fontSize: 12,
+                textDecoration: 'underline'
+              }}
+            >
+              Forgot password?
+            </button>
+          </div>
 
           <button type="submit" disabled={loading} style={{ display: 'block', width: 180, margin: '12px auto 0', padding: '10px 14px', background: '#5b7fff', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', textAlign: 'center' }}>
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
+
+        {error && (
+          <div style={{ marginTop: 12, padding: '10px', backgroundColor: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, color: '#dc2626', fontSize: 14, textAlign: 'center' }}>
+            {error}
+          </div>
+        )}
 
         <div style={{ marginTop: 14, textAlign: 'center' }}>
           <span style={{ fontSize: 14, color: '#666' }}>Don't have an account? </span>

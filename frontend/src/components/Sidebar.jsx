@@ -1,12 +1,17 @@
 import React from 'react';
 
-const Sidebar = ({ activeTab, setActiveTab, theme }) => {
-  const navItems = [
+const Sidebar = ({ activeTab, setActiveTab, theme, user }) => {
+  const baseNavItems = [
     { id: 'upload', label: 'Upload', icon: '📤' },
     { id: 'history', label: 'History', icon: '📋' },
     { id: 'documents', label: 'Documents', icon: '📁' },
     { id: 'analytics', label: 'Analytics', icon: '📊' }
   ];
+
+  // Add Users option only for admin users
+  const navItems = user && (user.role === 'admin' || user.is_superuser)
+    ? [...baseNavItems, { id: 'users', label: 'Users', icon: '👥' }]
+    : baseNavItems;
 
   return (
     <div

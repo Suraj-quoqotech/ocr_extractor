@@ -34,11 +34,11 @@ const DocumentsGrid = ({
   const [localSearch, setLocalSearch] = useState(searchTerm || '');
 
   // Toggle selection
-  const handleSelectDoc = (fileName) => {
+  const handleSelectDoc = (docKey) => {
     setSelectedDocs(prev =>
-      prev.includes(fileName)
-        ? prev.filter(f => f !== fileName)
-        : [...prev, fileName]
+      prev.includes(docKey)
+        ? prev.filter(f => f !== docKey)
+        : [...prev, docKey]
     );
   };
 
@@ -47,7 +47,11 @@ const DocumentsGrid = ({
     if (selectedDocs.length === visibleItems.length) {
       setSelectedDocs([]);
     } else {
-      setSelectedDocs(visibleItems.map(f => f.file_name));
+        setSelectedDocs(
+          visibleItems.map(
+            f => `${f.file_name}__${f.uploaded_by || "self"}`
+          )
+        );
     }
   };
 
@@ -67,7 +71,7 @@ const DocumentsGrid = ({
 
       // Get selected file objects
       const selectedFiles = filteredHistory.filter(f =>
-        selectedDocs.includes(f.file_name)
+      selectedDocs.includes(`${f.file_name}__${f.uploaded_by || "self"}`)
       );
 
       // Fetch and add each file to ZIP
@@ -125,7 +129,11 @@ const DocumentsGrid = ({
 
   const localFilteredHistory = (() => {
     const term = (localSearch || '').toLowerCase();
-    const localFiltered = (filteredHistory || []).slice().filter(f => f.file_name.toLowerCase().includes(term));
+    const localFiltered = (filteredHistory || []).slice().filter(f =>
+      f.file_name.toLowerCase().includes(term) ||
+      (f.uploaded_by && f.uploaded_by.toLowerCase().includes(term))
+    );
+
 
     // sort
     localFiltered.sort((a, b) => {
@@ -317,7 +325,8 @@ const DocumentsGrid = ({
               }}
             >
                 {localFilteredHistory.map((fileObj, idx) => {
-                const isSelected = selectedDocs.includes(fileObj.file_name);
+                const docKey = `${fileObj.file_name}__${fileObj.uploaded_by || "self"}`;
+                const isSelected = selectedDocs.includes(docKey);
                 const completionTime = formatCompletionTime(fileObj.processing_time);
 
                 return (
@@ -361,7 +370,7 @@ const DocumentsGrid = ({
                       <input
                         type="checkbox"
                         checked={isSelected}
-                        onChange={() => handleSelectDoc(fileObj.file_name)}
+                        onChange={() => handleSelectDoc(docKey)}
                         onClick={(e) => e.stopPropagation()}
                         style={{
                           cursor: "pointer",
@@ -390,6 +399,18 @@ const DocumentsGrid = ({
                     >
                       {fileObj.file_name}
                     </h3>
+                    {fileObj.uploaded_by && (
+                      <div
+                        style={{
+                          fontSize: "0.7rem",
+                          color: "#5b7fff",
+                          fontWeight: 600,
+                          marginBottom: "0.25rem"
+                        }}
+                      >
+                        Uploaded by: {fileObj.uploaded_by}
+                      </div>
+                    )}
 
                     <div
                       style={{

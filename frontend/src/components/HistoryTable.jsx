@@ -20,7 +20,10 @@ const HistoryTable = ({
   const localFilteredHistory = (() => {
     const term = (localSearch || '').toLowerCase();
     let localFiltered = (history || []).filter(file => {
-      const matchesSearch = file.file_name.toLowerCase().includes(term);
+      const matchesSearch =
+        file.file_name.toLowerCase().includes(term) ||
+        (file.uploaded_by && file.uploaded_by.toLowerCase().includes(term));
+
       const matchesStatus = filterStatus === 'all' || file.status === filterStatus;
       return matchesSearch && matchesStatus;
     });
@@ -183,6 +186,9 @@ const HistoryTable = ({
                 File Name
               </th>
               <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: isDark ? '#b0b0b0' : '#666' }}>
+                Uploaded By
+              </th>
+              <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: isDark ? '#b0b0b0' : '#666' }}>
                 Upload Date
               </th>
               <th style={{ padding: '0.75rem', textAlign: 'left', fontSize: '0.875rem', fontWeight: 600, color: isDark ? '#b0b0b0' : '#666' }}>
@@ -224,6 +230,11 @@ const HistoryTable = ({
                       <span style={{ color: isDark ? '#e0e0e0' : '#333' }}>{fileObj.file_name}</span>
                     </div>
                   </td>
+
+                  <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: isDark ? '#e0e0e0' : '#333' }}>
+                    {fileObj.uploaded_by ? fileObj.uploaded_by : '-'}
+                  </td>
+
 
                   <td style={{ padding: '0.75rem', fontSize: '0.875rem', color: isDark ? '#888' : '#666' }}>
                     {formatDate(fileObj.uploaded_at)}
